@@ -1,0 +1,49 @@
+Sub BatchAddBlankSlideAtEnd()
+    Dim pptApp As PowerPoint.Application
+    Dim pptPres As PowerPoint.Presentation
+    Dim folderPath As String
+    Dim fileName As String
+    
+    With Application.FileDialog(msoFileDialogFolderPicker)
+        .Title = "Select Folder with Presentations"
+        If .Show <> -1 Then Exit Sub
+        folderPath = .SelectedItems(1)
+    End With
+    
+    ' Remove any trailing slash to avoid Dir bugs
+    If Right(folderPath, 1) = "\" Then
+        folderPath = Left(folderPath, Len(folderPath) - 1)
+    End If
+    
+    Set pptApp = New PowerPoint.Application
+    pptApp.Visible = True
+
+    ' Safe search
+    fileName = Dir(folderPath & "\*.pptx")
+    If fileName = "" Then
+        MsgBox "No PPTX files found in: " & folderPath
+        Exit Sub
+    End If
+
+    Do While fileName <> ""
+        On Error Resume Next
+        Set pptPres = pptApp.Presentations.Open(folderPath & "\" & fileName)
+        
+        If Err.Number <> 0 Then
+            Debug.Print "Skipping bad file: " & fileName
+            Err.Clear
+            fileName = Dir
+            GoTo ContinueLoop
+        End If
+        On Error GoTo 0
+
+        pptPres.Slides.Add pptPres.Slides.Count + 1, ppLayoutBlank
+        pptPres.Save
+        pptPres.Close
+
+ContinueLoop:
+        fileName = Dir
+    Loop
+
+    MsgBox "Done!"
+End Sub
