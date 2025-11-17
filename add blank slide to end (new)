@@ -1,49 +1,71 @@
+Option Explicit
+
 Sub BatchAddBlankSlideAtEnd()
-    Dim pptApp As PowerPoint.Application
-    Dim pptPres As PowerPoint.Presentation
+    Dim pptApp As Object
+    Dim pptPres As Object
     Dim folderPath As String
     Dim fileName As String
+    Dim files() As String
+    Dim count As Long
+    Dim i As Long
+    Const ppLayoutBlank As Long = 12 ' Blank slide layout constant for late binding
+    Dim t As Single
     
+    ' Select folder
     With Application.FileDialog(msoFileDialogFolderPicker)
         .Title = "Select Folder with Presentations"
         If .Show <> -1 Then Exit Sub
         folderPath = .SelectedItems(1)
     End With
     
-    ' Remove any trailing slash to avoid Dir bugs
-    If Right(folderPath, 1) = "\" Then
-        folderPath = Left(folderPath, Len(folderPath) - 1)
-    End If
+    ' Ensure folder path ends with "\"
+    If Right(folderPath, 1) <> "\" Then folderPath = folderPath & "\"
     
-    Set pptApp = New PowerPoint.Application
-    pptApp.Visible = True
-
-    ' Safe search
-    fileName = Dir(folderPath & "\*.pptx")
-    If fileName = "" Then
+    ' Collect all PPTX filenames first
+    fileName = Dir(folderPath & "*.pptx")
+    count = 0
+    Do While fileName <> ""
+        count = count + 1
+        ReDim Preserve files(1 To count)
+        files(count) = fileName
+        fileName = Dir
+    Loop
+    
+    If count = 0 Then
         MsgBox "No PPTX files found in: " & folderPath
         Exit Sub
     End If
-
-    Do While fileName <> ""
+    
+    ' Create new PowerPoint instance (late binding)
+    Set pptApp = CreateObject("PowerPoint.Application")
+    pptApp.Visible = True
+    
+    ' Process each file exactly once
+    For i = 1 To count
         On Error Resume Next
-        Set pptPres = pptApp.Presentations.Open(folderPath & "\" & fileName)
-        
+        Set pptPres = pptApp.Presentations.Open(folderPath & files(i))
         If Err.Number <> 0 Then
-            Debug.Print "Skipping bad file: " & fileName
+            Debug.Print "Skipping bad file: " & files(i)
             Err.Clear
-            fileName = Dir
             GoTo ContinueLoop
         End If
         On Error GoTo 0
-
+        
+        ' Add a blank slide at the end
         pptPres.Slides.Add pptPres.Slides.Count + 1, ppLayoutBlank
+        
+        ' Save and close
         pptPres.Save
         pptPres.Close
-
+        
+        ' 1-second delay using simple timer loop
+        t = Timer
+        Do While Timer < t + 1
+            DoEvents
+        Loop
+        
 ContinueLoop:
-        fileName = Dir
-    Loop
-
-    MsgBox "Done!"
+    Next i
+    
+    MsgBox "Done! Blank slides added to all presentations in: " & folderPath
 End Sub
